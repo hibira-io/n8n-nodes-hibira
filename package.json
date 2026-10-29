@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "description": "n8n nodes for Hibira: publish realtime events and push notifications, and start workflows on Hibira webhooks (Pusher-compatible)",
   "license": "MIT",
-  "homepage": "https://github.com/hibira-io/n8n-nodes-hibira#readme",
+  "homepage": "https://hibira.io",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
