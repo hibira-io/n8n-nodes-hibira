@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- The package homepage on npm now links to https://hibira.io. No code changes.
+
 ## 0.1.1
 
 - First npm release: publish with public access (0.1.0 failed to publish because provenance needs a public package).
