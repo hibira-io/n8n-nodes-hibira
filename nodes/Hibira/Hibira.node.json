@@ -1,0 +1,12 @@
+{
+	"node": "n8n-nodes-hibira.hibira",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication", "Development"],
+	"resources": {
+		"credentialDocumentation": [
+			{ "url": "https://github.com/hibira-io/n8n-nodes-hibira#credentials" }
+		],
+		"primaryDocumentation": [{ "url": "https://github.com/hibira-io/n8n-nodes-hibira#readme" }]
+	}
+}
