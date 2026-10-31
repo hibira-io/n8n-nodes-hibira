@@ -1,5 +1,7 @@
 # n8n-nodes-hibira
 
+![n8n-nodes-hibira](.github/cover.jpg)
+
 n8n community nodes for [Hibira](https://hibira.io), the hosted realtime WebSocket service that speaks the Pusher Channels protocol, with Beams-compatible push notifications.
 
 - **Hibira**: publish realtime events from any workflow, read channel and presence state, close a user's connections, and send push notifications to iOS, Android and browsers.
