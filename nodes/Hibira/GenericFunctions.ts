@@ -22,6 +22,7 @@ export async function hibiraApiRequest(
 	resource: string,
 	body?: IDataObject,
 	qs: IDataObject = {},
+	extra: Partial<IHttpRequestOptions> = {},
 ): Promise<IDataObject> {
 	const credentials = await this.getCredentials('hibiraApi');
 	const options: IHttpRequestOptions = {
@@ -31,6 +32,7 @@ export async function hibiraApiRequest(
 		qs,
 		body,
 		json: true,
+		...extra,
 	};
 	try {
 		return (await this.helpers.httpRequestWithAuthentication.call(

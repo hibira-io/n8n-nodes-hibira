@@ -7,6 +7,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+import { approvalFields, approvalOperations } from './descriptions/ApprovalDescription';
 import { channelFields, channelOperations } from './descriptions/ChannelDescription';
 import { eventFields, eventOperations } from './descriptions/EventDescription';
 import { notificationFields, notificationOperations } from './descriptions/NotificationDescription';
@@ -58,6 +59,34 @@ function notificationPayload(ctx: IExecuteFunctions, i: number): IDataObject {
 	return payload;
 }
 
+// waitForApproval long-polls the approval (25 s per request, so no timers
+// are needed) until it is answered or expires, or Max Wait runs out. The
+// output keeps the answer link from the request.
+async function waitForApproval(
+	ctx: IExecuteFunctions,
+	i: number,
+	approval: IDataObject,
+): Promise<IDataObject> {
+	if (!ctx.getNodeParameter('waitForAnswer', i, false)) return approval;
+	const deadline = Date.now() + (ctx.getNodeParameter('maxWaitMinutes', i, 10) as number) * 60_000;
+	let current = approval;
+	while (current.status === 'pending') {
+		const left = Math.floor((deadline - Date.now()) / 1000);
+		if (left <= 0) break;
+		const next = await hibiraApiRequest.call(
+			ctx,
+			'GET',
+			`/approvals/${encodeURIComponent(String(approval.approval_id))}`,
+			undefined,
+			{ wait: Math.min(25, left) },
+			{ timeout: 40_000 },
+		);
+		current = { ...next, url: approval.url };
+	}
+	if (current.url === undefined) delete current.url;
+	return current;
+}
+
 export class Hibira implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Hibira',
@@ -66,7 +95,8 @@ export class Hibira implements INodeType {
 		group: ['output'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Publish realtime events and push notifications with Hibira (Pusher-compatible)',
+		description:
+			'Publish realtime events and push notifications, and ask people for approval, with Hibira (Pusher-compatible)',
 		defaults: {
 			name: 'Hibira',
 		},
@@ -77,7 +107,7 @@ export class Hibira implements INodeType {
 			{
 				name: 'hibiraApi',
 				required: true,
-				displayOptions: { show: { resource: ['event', 'channel', 'user'] } },
+				displayOptions: { show: { resource: ['approval', 'event', 'channel', 'user'] } },
 			},
 			{
 				name: 'hibiraPushApi',
@@ -92,6 +122,7 @@ export class Hibira implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{ name: 'Approval', value: 'approval' },
 					{ name: 'Channel', value: 'channel' },
 					{ name: 'Event', value: 'event' },
 					{ name: 'Push Notification', value: 'notification' },
@@ -99,6 +130,8 @@ export class Hibira implements INodeType {
 				],
 				default: 'event',
 			},
+			...approvalOperations,
+			...approvalFields,
 			...eventOperations,
 			...eventFields,
 			...channelOperations,
@@ -136,6 +169,29 @@ export class Hibira implements INodeType {
 					if (info.length > 0) body.info = info.join(',');
 					const response = await hibiraApiRequest.call(this, 'POST', '/events', body);
 					results = [{ channels, ...response }];
+				} else if (resource === 'approval' && operation === 'request') {
+					const extra = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
+					const body: IDataObject = {
+						title: this.getNodeParameter('title', i),
+						options: splitList(this.getNodeParameter('choices', i, '') as string),
+						agent: (extra.agent as string) || 'n8n',
+					};
+					if (extra.details) body.details = extra.details;
+					if (extra.expiresInMinutes) body.expires_in_minutes = extra.expiresInMinutes;
+					if (extra.channel) body.channel = extra.channel;
+					if (extra.pushInterests) body.push_interests = splitList(extra.pushInterests as string);
+					if (extra.pushUsers) body.push_users = splitList(extra.pushUsers as string);
+					if ((body.options as string[]).length === 0) delete body.options;
+					const created = await hibiraApiRequest.call(this, 'POST', '/approvals', body);
+					results = [await waitForApproval(this, i, created)];
+				} else if (resource === 'approval' && operation === 'get') {
+					const id = (this.getNodeParameter('approvalId', i) as string).trim();
+					const current = await hibiraApiRequest.call(
+						this,
+						'GET',
+						`/approvals/${encodeURIComponent(id)}`,
+					);
+					results = [await waitForApproval(this, i, current)];
 				} else if (resource === 'channel' && operation === 'getAll') {
 					const qs: IDataObject = {};
 					const prefix = this.getNodeParameter('prefix', i, '') as string;

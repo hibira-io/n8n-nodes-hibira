@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- **Approval** resource on the Hibira node: *Request* asks a person to approve or choose through a Hibira-hosted answer link (optionally delivered by push or announced on a channel) and can wait for the answer; *Get* reads a request's status and answer. Needs a Hibira server with the approvals HTTP API.
+
 ## 0.1.2
 
 - The package homepage on npm now links to https://hibira.io. No code changes.
