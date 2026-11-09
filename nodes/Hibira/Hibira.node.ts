@@ -12,6 +12,7 @@ import { channelFields, channelOperations } from './descriptions/ChannelDescript
 import { eventFields, eventOperations } from './descriptions/EventDescription';
 import { notificationFields, notificationOperations } from './descriptions/NotificationDescription';
 import { userFields, userOperations } from './descriptions/UserDescription';
+import { waitingRoomFields, waitingRoomOperations } from './descriptions/WaitingRoomDescription';
 import { hibiraApiRequest, hibiraPushRequest, splitList } from './GenericFunctions';
 
 // Programmatic rather than declarative: every Channels request carries an
@@ -62,6 +63,29 @@ function notificationPayload(ctx: IExecuteFunctions, i: number): IDataObject {
 // waitForApproval long-polls the approval (25 s per request, so no timers
 // are needed) until it is answered or expires, or Max Wait runs out. The
 // output keeps the answer link from the request.
+function waitingRoomBody(ctx: IExecuteFunctions, i: number): IDataObject {
+	const body: IDataObject = {};
+	const rate = ctx.getNodeParameter('admitPerMinute', i, 0) as number;
+	if (rate > 0) body.admit_per_minute = rate;
+	const fields = ctx.getNodeParameter('updateFields', i, {}) as IDataObject;
+	if (fields.state) body.state = fields.state;
+	if (fields.title !== undefined) body.title = fields.title;
+	if (fields.burst) body.burst = fields.burst;
+	if (fields.passTtlSeconds) body.pass_ttl_seconds = fields.passTtlSeconds;
+	if (fields.returnUrls !== undefined) body.return_urls = splitList(fields.returnUrls as string);
+	if (fields.startsAt !== undefined) {
+		const at = String(fields.startsAt);
+		const time = new Date(at);
+		if (at !== '' && Number.isNaN(time.getTime())) {
+			throw new NodeOperationError(ctx.getNode(), 'Starts At must be a date and time', {
+				itemIndex: i,
+			});
+		}
+		body.starts_at = at === '' ? '' : time.toISOString().replace(/\.\d{3}Z$/, 'Z');
+	}
+	return body;
+}
+
 async function waitForApproval(
 	ctx: IExecuteFunctions,
 	i: number,
@@ -107,7 +131,9 @@ export class Hibira implements INodeType {
 			{
 				name: 'hibiraApi',
 				required: true,
-				displayOptions: { show: { resource: ['approval', 'event', 'channel', 'user'] } },
+				displayOptions: {
+					show: { resource: ['approval', 'event', 'channel', 'user', 'waitingRoom'] },
+				},
 			},
 			{
 				name: 'hibiraPushApi',
@@ -127,6 +153,7 @@ export class Hibira implements INodeType {
 					{ name: 'Event', value: 'event' },
 					{ name: 'Push Notification', value: 'notification' },
 					{ name: 'User', value: 'user' },
+					{ name: 'Waiting Room', value: 'waitingRoom' },
 				],
 				default: 'event',
 			},
@@ -140,6 +167,8 @@ export class Hibira implements INodeType {
 			...userFields,
 			...notificationOperations,
 			...notificationFields,
+			...waitingRoomOperations,
+			...waitingRoomFields,
 		],
 	};
 
@@ -246,6 +275,28 @@ export class Hibira implements INodeType {
 						{},
 					);
 					results = [{ userId, success: true }];
+				} else if (resource === 'waitingRoom') {
+					const room = (this.getNodeParameter('room', i) as string).trim();
+					const path = `/waiting_rooms/${encodeURIComponent(room)}`;
+					if (operation === 'get') {
+						results = [await hibiraApiRequest.call(this, 'GET', path)];
+					} else if (operation === 'upsert') {
+						results = [await hibiraApiRequest.call(this, 'POST', path, waitingRoomBody(this, i))];
+					} else if (operation === 'admit') {
+						const count = this.getNodeParameter('count', i) as number;
+						results = [await hibiraApiRequest.call(this, 'POST', `${path}/admit`, { count })];
+					} else if (operation === 'verifyPass') {
+						const pass = (this.getNodeParameter('pass', i) as string).trim();
+						results = [
+							{ room, ...(await hibiraApiRequest.call(this, 'POST', `${path}/verify`, { pass })) },
+						];
+					} else if (operation === 'delete') {
+						results = [{ room, ...(await hibiraApiRequest.call(this, 'DELETE', path)) }];
+					} else {
+						throw new NodeOperationError(this.getNode(), `Unsupported operation ${operation}`, {
+							itemIndex: i,
+						});
+					}
 				} else if (resource === 'notification' && operation === 'publishToInterests') {
 					const interests = splitList(this.getNodeParameter('interests', i) as string);
 					const body = { ...notificationPayload(this, i), interests };
