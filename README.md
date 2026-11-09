@@ -29,8 +29,15 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | Push Notification | Delete User | Remove a user and their devices from push. |
 | Approval | Request | Ask a person to approve or choose (2 to 4 options) through a Hibira-hosted answer link, and by default wait for the answer. |
 | Approval | Get | The status of a request (`pending`, `approved`, `rejected`, `expired`) with the choice and comment, optionally waiting for the answer. |
+| Waiting Room | Get | A waiting room's settings and queue counts (waiting, admitted, issued). |
+| Waiting Room | Create or Update | Create a room (Admit per Minute is required) or change its state, rate, start time, title, burst, pass lifetime or return URLs. |
+| Waiting Room | Admit | Let the next N visitors through now, on top of the steady rate. |
+| Waiting Room | Verify Pass | Check a visitor's pass; outputs `valid`, `number`, `ticket_id` and `expires_at`. |
+| Waiting Room | Delete | Delete a room and its queue. |
 
 **Approvals** (human in the loop): *Request* returns `approval_id` and `url`, a link anyone can answer once (the first option approves, any other rejects). Send the link by email or chat, or let Hibira deliver it with **Push to Interests / User IDs** or announce it on a **Channel** for the [`@hibira-io/approvals`](https://www.npmjs.com/package/@hibira-io/approvals) inbox. With **Wait for Answer** on, the node holds the workflow until the person answers or **Max Wait** (up to 60 minutes) runs out, then outputs `status` and `choice`; route on `status` with an IF node. For longer waits, turn it off and check later with *Get*. Approvals need an app in a Hibira account and use the Hibira API credential.
+
+**Waiting rooms** queue visitors on a Hibira-hosted page and send them back with a signed pass. Use the node to open a room on a schedule, pause it when stock runs out, admit a batch when a sale opens, or check a pass from a form or checkout webhook. Record `ticket_id` to allow one checkout per place in line. Waiting rooms need the waiting room add-on and use the Hibira API credential.
 
 Push notifications take a **Simple** payload (title, body, link and data, sent to the platforms you choose) or your own **JSON** `apns`, `fcm` and `web` payloads, as in the Pusher Beams API.
 

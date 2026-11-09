@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- **Waiting Room** resource on the Hibira node: *Get*, *Create or Update*, *Admit*, *Verify Pass* and *Delete* a waiting room through the signed HTTP API. Needs a Hibira server with waiting rooms.
+
 ## 0.2.0
 
 - **Approval** resource on the Hibira node: *Request* asks a person to approve or choose through a Hibira-hosted answer link (optionally delivered by push or announced on a channel) and can wait for the answer; *Get* reads a request's status and answer. Needs a Hibira server with the approvals HTTP API.
