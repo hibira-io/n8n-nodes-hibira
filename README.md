@@ -92,6 +92,28 @@ Built with `@n8n/node-cli` 0.54 and tested on n8n 2.45. Requires n8n 1.0 or late
 - **Notify a team channel when a support room fills up**: Hibira Trigger (Member Added, Channel Prefix `presence-support-`) → Hibira Channel *Get* with User Count → Slack.
 - **Broadcast new orders to dashboards**: Shopify or Stripe trigger → Hibira Event *Trigger* on `orders` with the order as data.
 - **Remind abandoned carts by push**: Schedule → database query → Hibira Push Notification *Publish to Users*.
+- **Ask a supervisor before a database change**: see the recipe below.
+
+### Recipe: supervisor approval for database changes
+
+Reads run by themselves; anything that could change data waits for a supervisor who sees the exact statement and its plan. n8n keeps the database credentials, so Hibira only carries the question and the answer.
+
+1. **Trigger** with the statement in `sql`: a chat or form trigger, a webhook from your app, or an AI Agent's tool call.
+2. **Code** (Run Once for Each Item) marks reads. It is deliberately strict: one statement, starting with a read word, with no word that writes. Anything unsure is a write.
+
+   ```js
+   const s = $json.sql.trim().replace(/;\s*$/, '');
+   const read = !s.includes(';')
+     && /^(select|with|explain|show)\b/i.test(s)
+     && !/\b(insert|update|delete|merge|create|alter|drop|truncate|grant|revoke|copy|call|into|analyze|set|nextval|setval|for\s+(update|share))\b/i.test(s);
+   return { json: { ...$json, read } };
+   ```
+
+3. **IF** `read` is true → **Postgres** (or MySQL) *Execute Query* with `{{ $json.sql }}`, using a database user that can only read.
+4. Otherwise → **Postgres** *Execute Query* `EXPLAIN {{ $json.sql }}` for the plan and estimated rows (EXPLAIN without ANALYZE does not run it) → **Crypto** *Hash* SHA256 of `sql` into `fingerprint` → **Hibira** *Approval › Request*: Title `Run this change on the shop database?`, Details the statement, the plan and `SHA-256: {{ $json.fingerprint }}`, Wait for Answer on. Add **Push to User IDs** to reach the supervisor's phone, or a **Channel** to show the request and its answer live in your own app.
+5. **IF** `status` is `approved` → **Crypto** *Hash* the `sql` again and check it equals `fingerprint` → **Postgres** *Execute Query* with that `sql`. On `rejected`, send the supervisor's `comment` back to the requester.
+
+The same pattern, with live status in a web console and a phone approval page, is the [database changes guide](https://hibira.io/use-cases/database-write-approvals).
 
 ## Resources
 
