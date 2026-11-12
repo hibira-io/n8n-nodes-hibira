@@ -20,6 +20,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 | Resource | Operation | What it does |
 |---|---|---|
 | Event | Trigger | Publish an event to up to 100 channels. Optionally exclude a socket ID and return each channel's subscription or user count. |
+| Event | Update Live Chart | Update a live chart or poll opened through the Hibira MCP server: set or add to a number, add to one bar, set every bar, or reset it, with an optional goal, title, subtitle and status. The chart redraws at once. |
 | Channel | Get | One channel's state (occupied, subscription count, user count). |
 | Channel | Get Many | Occupied channels, one item per channel, optionally filtered by prefix. |
 | Channel | Get Users | The users on a presence channel, one item per user (large presence channels are paged for you). |

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- **Update Live Chart** on the Event resource: sends `chart.update` to a live chart's private channel (a KPI number, line, bars, progress bar, funnel or live poll opened through the Hibira MCP server), so a workflow can move the chart without writing JSON. Uses the Hibira API credential.
+
 ## 0.3.0
 
 - **Waiting Room** resource on the Hibira node: *Get*, *Create or Update*, *Admit*, *Verify Pass* and *Delete* a waiting room through the signed HTTP API. Needs a Hibira server with waiting rooms.

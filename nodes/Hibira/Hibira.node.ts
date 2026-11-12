@@ -9,7 +9,7 @@ import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { approvalFields, approvalOperations } from './descriptions/ApprovalDescription';
 import { channelFields, channelOperations } from './descriptions/ChannelDescription';
-import { eventFields, eventOperations } from './descriptions/EventDescription';
+import { chartFields, eventFields, eventOperations } from './descriptions/EventDescription';
 import { notificationFields, notificationOperations } from './descriptions/NotificationDescription';
 import { userFields, userOperations } from './descriptions/UserDescription';
 import { waitingRoomFields, waitingRoomOperations } from './descriptions/WaitingRoomDescription';
@@ -58,6 +58,48 @@ function notificationPayload(ctx: IExecuteFunctions, i: number): IDataObject {
 		throw new NodeOperationError(ctx.getNode(), 'Choose at least one platform', { itemIndex: i });
 	}
 	return payload;
+}
+
+// chartData builds a live chart update (the chart.update event the Hibira
+// MCP server's live chart panel reads): one of value, add or values, plus
+// the optional goal, title, subtitle and status.
+function chartData(ctx: IExecuteFunctions, i: number): IDataObject {
+	const update = ctx.getNodeParameter('chartUpdate', i) as string;
+	const data: IDataObject = {};
+	if (update === 'reset') {
+		data.reset = true;
+	} else if (update === 'values') {
+		const rows = (ctx.getNodeParameter('chartValues.items', i, []) as IDataObject[]) ?? [];
+		const values: IDataObject = {};
+		for (const row of rows) {
+			const label = String(row.label ?? '').trim();
+			if (label) values[label] = Number(row.value);
+		}
+		if (Object.keys(values).length === 0) {
+			throw new NodeOperationError(ctx.getNode(), 'Add at least one label', { itemIndex: i });
+		}
+		data.values = values;
+	} else {
+		const value = ctx.getNodeParameter('chartValue', i) as number;
+		if (!Number.isFinite(value)) {
+			throw new NodeOperationError(ctx.getNode(), 'Number must be a number', { itemIndex: i });
+		}
+		if (update === 'addLabel') {
+			const label = (ctx.getNodeParameter('chartLabel', i) as string).trim();
+			if (!label) {
+				throw new NodeOperationError(ctx.getNode(), 'Enter a label', { itemIndex: i });
+			}
+			data.add = { [label]: value };
+		} else {
+			data[update] = value;
+		}
+	}
+	const options = ctx.getNodeParameter('chartOptions', i, {}) as IDataObject;
+	if (options.max !== undefined) data.max = options.max;
+	for (const key of ['title', 'subtitle', 'status']) {
+		if (options[key]) data[key] = options[key];
+	}
+	return data;
 }
 
 // waitForApproval long-polls the approval (25 s per request, so no timers
@@ -161,6 +203,7 @@ export class Hibira implements INodeType {
 			...approvalFields,
 			...eventOperations,
 			...eventFields,
+			...chartFields,
 			...channelOperations,
 			...channelFields,
 			...userOperations,
@@ -198,6 +241,24 @@ export class Hibira implements INodeType {
 					if (info.length > 0) body.info = info.join(',');
 					const response = await hibiraApiRequest.call(this, 'POST', '/events', body);
 					results = [{ channels, ...response }];
+				} else if (resource === 'event' && operation === 'updateChart') {
+					const channel = (this.getNodeParameter('chartChannel', i) as string).trim();
+					if (!channel.startsWith('private-')) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'A live chart listens on a private channel, such as private-chart-3f9a1c2b7d4e',
+							{ itemIndex: i },
+						);
+					}
+					const data = chartData(this, i);
+					const options = this.getNodeParameter('chartOptions', i, {}) as IDataObject;
+					const body: IDataObject = {
+						name: (options.eventName as string) || 'chart.update',
+						channels: [channel],
+						data: JSON.stringify(data),
+					};
+					const response = await hibiraApiRequest.call(this, 'POST', '/events', body);
+					results = [{ channel, data, ...response }];
 				} else if (resource === 'approval' && operation === 'request') {
 					const extra = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 					const body: IDataObject = {
