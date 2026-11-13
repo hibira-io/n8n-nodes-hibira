@@ -153,6 +153,16 @@ async function waitForApproval(
 	return current;
 }
 
+function channelInfo(ctx: IExecuteFunctions, i: number): string[] {
+	const options = ctx.getNodeParameter('options', i, {}) as IDataObject;
+	return (options.info as string[] | undefined) ?? [];
+}
+
+function channelPrefix(ctx: IExecuteFunctions, i: number): string {
+	const filters = ctx.getNodeParameter('filters', i, {}) as IDataObject;
+	return (filters.prefix as string | undefined) ?? '';
+}
+
 export class Hibira implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Hibira',
@@ -284,8 +294,8 @@ export class Hibira implements INodeType {
 					results = [await waitForApproval(this, i, current)];
 				} else if (resource === 'channel' && operation === 'getAll') {
 					const qs: IDataObject = {};
-					const prefix = this.getNodeParameter('prefix', i, '') as string;
-					const info = this.getNodeParameter('info', i, []) as string[];
+					const prefix = channelPrefix(this, i);
+					const info = channelInfo(this, i);
 					if (prefix) qs.filter_by_prefix = prefix;
 					if (info.length > 0) qs.info = info.join(',');
 					const response = await hibiraApiRequest.call(this, 'GET', '/channels', undefined, qs);
@@ -298,7 +308,7 @@ export class Hibira implements INodeType {
 					}
 				} else if (resource === 'channel' && operation === 'get') {
 					const name = this.getNodeParameter('channel', i) as string;
-					const info = this.getNodeParameter('info', i, []) as string[];
+					const info = channelInfo(this, i);
 					const qs: IDataObject = info.length > 0 ? { info: info.join(',') } : {};
 					const response = await hibiraApiRequest.call(
 						this,
