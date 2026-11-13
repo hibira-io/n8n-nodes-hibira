@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- On *Channel → Get* and *Get Many*, the optional **Info** setting moves into an **Options** collection and **Filter by Prefix** moves into a **Filters** collection (as *Name Prefix*), following the n8n verification guidelines. Workflows that set either one need to set it again in its new place.
+
 ## 0.4.0
 
 - **Update Live Chart** on the Event resource: sends `chart.update` to a live chart's private channel (a KPI number, line, bars, progress bar, funnel or live poll opened through the Hibira MCP server), so a workflow can move the chart without writing JSON. Uses the Hibira API credential.
